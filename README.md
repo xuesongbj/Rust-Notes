@@ -2,8 +2,11 @@
 
 [![License](https://img.shields.io/npm/l/heroicons.svg)](https://github.com/xuesongbj/Rust-Notes/blob/main/LICENSE)
 
-
 Rust是一门系统级编程语言，和C、C++、Go等语言的设计思想有较大差异。学习Rust并不仅仅学习一门语言，更重要是学习它的设计思想。
+
+![rust programming language](./rust_language.jpeg)
+
+&nbsp;
 
 ## 为什么使用Rust？
 
@@ -14,6 +17,8 @@ Rust是一门系统级编程语言，和C、C++、Go等语言的设计思想有�
 航空电子设备、自动驾驶汽车、核电站、交通控制系统、植入式心脏起搏器等。此类系统中的错误几乎总是危机人类生命。
 
 「通过测试检查程序正确性」和「逻辑证明程序正确性」之间存在着巨大差异。不幸的是，即使我们对代码的每一样都进行了测试，我们仍然无法确定它是否正确。
+
+&nbsp;
 
 ### Rust优势
 
@@ -29,6 +34,8 @@ Rust是一门系统级编程语言，和C、C++、Go等语言的设计思想有�
 
 Linux 内核是由业内顶级的 **5%** 中的佼佼者编写的，然而每年仍然可以在CVE(CVE是国际著名的安全漏洞库)中发现50多个安全漏洞。当然，与数百万行代码相比，这 **50** 个错误微不足道。但是，生死问题，还记得吗？ 当我们谈论关键系统时，即使是微小的错误也可能导致灾难性的后果。更不用说这 **50** 个是发现的错误，谁知道还有多少没有被发现的？ **如果使用Rust，我们会在编译发现这些问题** 。
 
+&nbsp;
+
 #### 运行速度优势
 
 现在编程语言中的 **内存安全伴随着垃圾回收的成本** ，并发通常通过同步原子性锁定所受影响的数据结构和执行路径进行解决。对于Rust来说，并不会采用运行时GC这种方式保证内存安全，Rust在编译时就解决了这些问题。
@@ -36,6 +43,55 @@ Linux 内核是由业内顶级的 **5%** 中的佼佼者编写的，然而每年
 在`C++`中，只需要为使用的内存负责。例如，在Rust中，只有在绝对需要时才使用Mutex，而且Rust编译器会强制你使用它，所以你永远不会忘记添加它。而这一切基本上都是零成本的。由于大多数检查是在编译器执行的，因此编译后的程序与`C`或`C++`编译器生成的程序集没有太大区别。正因为如此，**Rust现在在嵌入式电子、物联网，甚至操作系统开发领域都非常有前途** -- 以前由于高控制要求和严格的资源和性能限制，这些领域由`C`主导。
 
 Rust最新版本甚至为用户空间带来了SIMD支持。之前，由于API稳定性限制，它仅在`beta`版本中可用。现在，你可以通过直接使用向量指令或使用方便的lib库来释放硬件的潜力。
+
+&nbsp;
+
+#### 内存安全可保证
+
+* 没有无效的内存访问
+    * 没有缓冲区溢出(No buffer overflows)
+    * 没有悬垂指针(No dangling pointers)
+    * 没有数据竞争(No data race)
+
+&nbsp;
+
+#### 不断完善的工具链
+
+* rustup: 不同的目录可以构建不同的rust版本
+* cargo: 自动下载、编译和链接依赖项
+* rustfmt: 根据样式格式化rust代码
+* Rust Playground: 以浏览器方式运行和共享代码片段
+
+![rust playground](./rust_playground.png)
+
+* clippy: 语法检查工具
+* proptest: 属性测试框架
+* bootimage: 从 Rust 内核创建可引导磁盘映像
+
+&nbsp;
+
+#### 持续迭代的新功能
+
+* 隐含特征(impl Trait): 从函数返回闭包
+* Non-Lexical生命周期: 更智能的借用检查器
+* WebAssembly: 在浏览器中运行Rust
+* Async: Async/Await、Generators(yield)
+
+#### 日益壮大的Rust基金会
+
+继亚马逊AWS、华为、谷歌Google、微软Microsoft和Mozilla后，**FaceBook宣布加入Rust基金会**，并承诺将加大对Rust采用。
+
+![facebook](./rust_facebook.jpeg)
+
+Rust董事会成员共有12人，创始成员承诺：在2年内，将提供**每年超过100W美元的预算**，用于Rust项目的维护、开发和推广。
+
+![Board of Directors](./rust_board.png)
+
+[rust foundation members](https://foundation.rust-lang.org/members/)
+
+[Rust Foundation Overview](https://foundation.rust-lang.org/static/rust-foundation-overview.pdf)
+
+&nbsp;
 
 ## 笔记目录
 
