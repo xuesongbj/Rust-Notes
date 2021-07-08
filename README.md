@@ -99,7 +99,7 @@ Rust董事会成员共有12人，创始成员承诺：在2年内，将提供**�
 
 [LKML Archive on lore.kernel.org](https://lore.kernel.org/lkml/20210704202756.29107-1-ojeda@kernel.org/)
 
-[Rust-for-Linux](https://github.com/Rust-for-Linux/rust)
+[Rust-for-Linux](https://github.com/Rust-for-Linux/linux)
 
 
 ## 笔记目录
