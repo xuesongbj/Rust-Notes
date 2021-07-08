@@ -81,8 +81,6 @@ Rust最新版本甚至为用户空间带来了SIMD支持。之前，由于API稳
 
 继亚马逊AWS、华为、谷歌Google、微软Microsoft和Mozilla后，**FaceBook宣布加入Rust基金会**，并承诺将加大对Rust采用。
 
-![facebook](./rust_facebook.jpeg)
-
 Rust董事会成员共有12人，创始成员承诺：在2年内，将提供**每年超过100W美元的预算**，用于Rust项目的维护、开发和推广。
 
 ![Board of Directors](./rust_board.png)
@@ -92,6 +90,17 @@ Rust董事会成员共有12人，创始成员承诺：在2年内，将提供**�
 [Rust Foundation Overview](https://foundation.rust-lang.org/static/rust-foundation-overview.pdf)
 
 &nbsp;
+
+#### 活跃社区及Linus认可
+
+2021/07/04号，Linux支持Rust作为第二语言以支持补丁到Linux内核，得到Linux基金会的充分认可。
+
+![rust for linux](./imgs/rust-for-linux.jpg)
+
+[LKML Archive on lore.kernel.org](https://lore.kernel.org/lkml/20210704202756.29107-1-ojeda@kernel.org/)
+
+[Rust-for-Linux](https://github.com/Rust-for-Linux/rust)
+
 
 ## 笔记目录
 
