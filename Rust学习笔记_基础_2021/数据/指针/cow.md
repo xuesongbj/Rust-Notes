@@ -65,6 +65,55 @@ fn main() {
 }
 ```
 
+```x86asm
+   ; let mut cow: Cow<[_]> = Cow::Owned(vec![1, 2, 3]);
+   0x0000555555559c77 <+7>:	mov    edi,0xc
+   0x0000555555559c7c <+12>:	mov    esi,0x4
+   0x0000555555559c81 <+17>:	call   0x55555555acf0 <alloc::alloc::exchange_malloc>
+   0x0000555555559c86 <+22>:	mov    rcx,rax
+   0x0000555555559c89 <+25>:	mov    DWORD PTR [rax],0x1
+   0x0000555555559c8f <+31>:	mov    DWORD PTR [rax+0x4],0x2
+   0x0000555555559c96 <+38>:	mov    DWORD PTR [rax+0x8],0x3
+   0x0000555555559c9d <+45>:	lea    rdi,[rsp+0x88]
+   0x0000555555559ca5 <+53>:	mov    rsi,rcx
+   0x0000555555559ca8 <+56>:	mov    edx,0x3
+   0x0000555555559cad <+61>:	call   0x55555555c610 <alloc::slice::<impl [T]>::into_vec>
+   0x0000555555559cb2 <+66>:	mov    rax,QWORD PTR [rsp+0x98]
+   0x0000555555559cba <+74>:	mov    QWORD PTR [rsp+0x80],rax
+   0x0000555555559cc2 <+82>:	movups xmm0,XMMWORD PTR [rsp+0x88]
+   0x0000555555559cca <+90>:	movups XMMWORD PTR [rsp+0x70],xmm0
+   0x0000555555559ccf <+95>:	mov    QWORD PTR [rsp+0x68],0x1
+   0x0000555555559cd8 <+104>:	lea    rdi,[rsp+0x68]
+
+   ; let hello = cow.to_mut();
+=> 0x0000555555559cdd <+109>:	call   0x55555555c150 <alloc::borrow::Cow<B>::to_mut>
+   0x0000555555559ce2 <+114>:	mov    QWORD PTR [rsp+0x60],rax
+   0x0000555555559ce7 <+119>:	jmp    0x555555559ce9 <ddd::main+121>
+   0x0000555555559ce9 <+121>:	mov    rax,QWORD PTR [rsp+0x60]
+   0x0000555555559cee <+126>:	mov    QWORD PTR [rsp+0xa0],rax
+   0x0000555555559cf6 <+134>:	lea    rcx,[rsp+0xa0]
+
+; Cow::Owned(vec![1, 2, 3]) 调用完后，内存布局
+(gdb) x/xg $rax
+0x7fffffffe338:	0x00005555555a09d0
+
+(gdb) x/xg 0x00005555555a09d0
+0x5555555a09d0:	0x0000000200000001
+
+(gdb) x/2xg 0x00005555555a09d0
+0x5555555a09d0:	0x0000000200000001	0x0000000000000003
+
+; let hello = cow.to_mut() 调用cow.to_mut()使用Cow(Clone on Write)
+(gdb) p/x $rax
+$2 = 0x7fffffffe320
+
+(gdb) x/xg 0x7fffffffe320
+0x7fffffffe320:	0x00005555555a09d0
+
+(gdb) x/2xg 0x00005555555a09d0
+0x5555555a09d0:	0x0000000200000001	0x0000000000000003
+```
+
 &nbsp;
 
 ### into_owned 例子
@@ -79,4 +128,30 @@ fn main() {
 
     assert_eq!(vec![1, 2, 3], hello);
 }
+```
+
+```x86asm
+hello = alloc::vec::Vec<i32, alloc::alloc::Global> {
+  buf: alloc::raw_vec::RawVec<i32, alloc::alloc::Global> {
+    ptr: core::ptr::unique::Unique<i32> {
+      pointer: 0x5555555a09d0,
+      _marker: core::marker::PhantomData<i32>
+    },
+    cap: 3,
+    alloc: alloc::alloc::Global
+  },
+  len: 3
+}
+
+cow = alloc::borrow::Cow<[i32]>::Owned(alloc::vec::Vec<i32, alloc::alloc::Global> {
+    buf: alloc::raw_vec::RawVec<i32, alloc::alloc::Global> {
+      ptr: core::ptr::unique::Unique<i32> {
+        pointer: 0x5555555a09d0,
+        _marker: core::marker::PhantomData<i32>
+      },
+      cap: 3,
+      alloc: alloc::alloc::Global
+    },
+    len: 3
+  })
 ```
