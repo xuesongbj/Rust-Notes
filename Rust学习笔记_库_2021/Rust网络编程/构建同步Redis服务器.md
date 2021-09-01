@@ -13,7 +13,7 @@ RESP支持各种消息，包括简单字符串、整数、数组及批量字符�
 ### 修改配置项
 
 ```toml
-// rudis_sync/Cargo.toml
+# rudis_sync/Cargo.toml
 
 [dependencies]
 lazy_static = "1.2.0"
