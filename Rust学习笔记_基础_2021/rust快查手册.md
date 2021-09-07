@@ -1,6 +1,10 @@
 # Rust快查手册
 
-## Data Structure
+Rust Cheat Sheet(Rust语言备忘录)原版本，可参考[该链接](https://cheats.rs/)
+
+&nbsp;
+
+## Data Structure(数据结构)
 
 &nbsp;
 
@@ -46,3 +50,45 @@
 * `x[..=b]`：获取0到b个元素(包含b)
 * `s.x`：命名字段访问,如果 `x` 不是类型 `S` 的一部分，可能是 `Deref`
 * `s.0`：元组类型访问
+
+&nbsp;
+
+## References & Pointers(引用和指针)
+
+* `&S`：共享引用
+    * `&[S]`：特殊的slice引用(包含: address, length)
+    * `&str`：特殊的string slice引用(包含: address, length)
+    * `&mut S`：允许可变性的独占引用(`&mut [S]`,`&mut dyn S`, ...)
+    * `&dyn T`：特殊 `Trait object` 引用(包括:address, vtable)
+
+* `&s`：共享借用
+    * `&mut s`：独享可变借用对象
+    * `&raw const s`：`unsafe` 原始指针
+    * `&raw mut s`：可变原始指针(原始指针需要未对齐压缩字段)
+
+* `ref s`：通过引用绑定
+    * `let ref r = s`：同 `let r = &s` 效果相同
+    * `let S {ref mut x} = s`：可变绑定(`let x = &mut s.x`)简写版本
+    
+* `*r`：指针解引用
+    * `*r = s`：如果 `r` 是可变引用，`move or copy s` 到目标 `memory`
+    * `s = *r`：如果 `r` 可以 `Copy`，复制 `r`
+    * `s = *r`：如果 `r` 不可以 `Copy`，错误
+    * `s = *my_box`：`Box`特殊用法，如果 `Box` 未实现 `Copy`，则 `Box` 进行 `move`(所有权转移)
+
+* `'a`：生命周期
+    * `&'a S`：只接受一个带有 `s` 的地址，地址生命周期比 `'a` 更长
+    * `&'a mut S`：同上，但是 `s` 指向的内存可变
+    * `struct S<'a> {}`：`S`地址的生命周期是`'a`，创建 `S` 决定了 `'a`生命周期长短
+    * `trait T<'a> {}`：`S`实现`T`, `S` 决定了 `'a`生命周期长短
+    * `fn f<'a>(t: &'a T)`：调用者决定了 `'a` 生命周期长短
+
+* `'static`：持续整个程序执行的特殊生命周期
+
+&nbsp;
+
+## Function & Behavior(函数和行为)
+
+定义代码单元(crate)及其抽象
+
+* `trait T {}`：定义一个 `trait`；其它人可以实现 `implement`
