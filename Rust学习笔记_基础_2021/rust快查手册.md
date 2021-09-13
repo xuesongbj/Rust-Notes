@@ -259,3 +259,41 @@ Rust Cheat Sheet(Rust语言备忘录)原版本，可参考[该链接](https://ch
     * `'b: 'a`: `'b`生命周期至少和`'a`一样长
 
 &nbsp;
+
+## Higher-ranked items(高级用法 `trait bound`)
+
+类型(`type`)和特征(`trait`)相关的抽象，就是熟练生命周期的运用。
+
+* `for<'a>`： 更高级的`trait bound`，绑定(bounds)标记
+    * `trait T: for<'a> R<'a> {}`：实现`T`(特征)的`S`(结构体)在任何生命周期内满足`R`
+* `fn(&'a u8)`：带有生命周期的函数指针
+* `for<'a> fn(&'a u8)`：更高级别的，带有生命周期的函数指针
+    * `fn(&'_ u8)`：编译器自动生成`for<'a> fn(&'a u8)`
+    * `fn(&u8)`：编译器自动生成`for<'a> fn(&'a u8)`
+* `dyn for<'a> Fn(&'a u8)`：更高级别的(trait-object)类型，和上面的 `fn` 一样
+    * `dyn Fn(&'_ u8)`：编译器自动生成 `dyn for<'a> Fn(&'a u8)`
+    * `dyn Fn(&u8)`：编译器自动生成 `dyn for<'a> Fn(&'a u8)`
+
+`for<>` 作为类型的一部分，这就是为什么 `for<'a> fn(&'a u8)` 编写 `impl T` 的原因。
+
+&nbsp;
+
+### implementing Traits Explanation
+
+* `impl<'a> T for fn(&'a u8) {}`：函数指针，实现 `T`特征，允许带有生命周期(`'a`)参数
+* `impl T for for<'a> fn(&'a u8)`：函数指针，实现 `T`特征，允许带有生命周期(`'a`)参数
+* `impl T for fn(&u8) {}`：和上面相同，简写方式
+
+&nbsp;
+
+## String & Chars (字符串&字符)
+
+Rust有几种方式进行字符串和字符的操作。
+
+* `"..."`：字符串字面量(UTF-8)，通常 `\n` 换行符用 `0xA` 表示
+* `r"..."`：原始字符串字面量(UTF-8)，不会解析 `\n`
+* `r#"..."#`：原始字符串字面量(UTF-8)
+* `b"..."`：二进制字面量
+* `br"...", br#"..."#`：原始二进制字面量
+* `'...'`：字符字面量
+* `b'x'`：ASCII字节字面量
