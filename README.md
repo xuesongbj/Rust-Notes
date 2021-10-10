@@ -128,6 +128,7 @@ Rust董事会成员共有12人，创始成员承诺：在2年内，将提供**�
 │   │   ├── 异步网络IO
 │   │   └── 构建同步Redis服务器
 │   ├── exercises
+|   |   ├── clippy 
 │   │   ├── collections
 │   │   ├── enums
 │   │   ├── functions
