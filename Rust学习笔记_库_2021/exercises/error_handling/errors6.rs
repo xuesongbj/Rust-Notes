@@ -39,9 +39,10 @@ fn parse_pos_nonzero(s: &str) -> Result<PositiveNonzeroInteger, ParsePosNonzeroE
 Option III:
 
 fn parse_pos_nonzero(s: &str) -> Result<PositiveNonzeroInteger, ParsePosNonzeroError> {
+    // and_then : 如果没有异常，则执行and_then参数的函数，否则返回 ParsePosNonzeroError::from_parsing 错误
     s.parse()
     .map_err(ParsePosNonzeroError::from_parsing)
-    .add_then(|x| {
+    .and_then(|x| {
         PositiveNonzeroInteger::new(x)
             .map_err(ParsePosNonzeroError::from_creation)
     })
