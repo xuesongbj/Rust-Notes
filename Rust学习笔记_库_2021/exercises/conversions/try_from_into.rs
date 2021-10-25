@@ -10,16 +10,11 @@ struct Color {
 #[derive(Debug, PartialEq)]
 enum IntoColorError {
     // Incorrect length of slice
-    Badlen,
+    BadLen,
 
     // Integer conversion error
     IntConversion,
 }
-
-fn in_range(rgb: &[u8; 3]) -> bool {
-    rgb.iter().all(|&x| 0 <= x && x <= 255)
-}
-
 
 impl TryFrom<(i16, i16, i16)> for Color {
     type Error = IntoColorError;
@@ -43,10 +38,12 @@ impl TryFrom<[i16; 3]> for Color {
 impl TryFrom<&[i16]> for Color {
     type Error = IntoColorError;
     fn try_from(slice: &[i16]) -> Result<Self, Self::Error> {
-       match slice {
-            rgb @ [_, _, _] => Color::try_from(rgb),
-            _ => Err(IntoColorError::IntConversion)
-       }
+        if slice.len() != 3 {
+            return Err(IntoColorError::BadLen);
+        }
+
+        let (red, green, blue) = (slice[0], slice[1], slice[2]);
+        Color::try_from((red, green, blue))
     }
 }
 
@@ -72,7 +69,7 @@ mod tests {
     #[test]
     fn test_tuple_out_of_range_positive() {
         assert_eq!(
-            Color::try_from(256, 1000, 10000),
+            Color::try_from((256, 1000, 10000)),
             Err(IntoColorError::IntConversion)
         );
     }
@@ -80,7 +77,7 @@ mod tests {
     #[test]
     fn test_tuple_out_of_range_negative() {
         assert_eq!(
-            Color::try_from(-1, -10, -256),
+            Color::try_from((-1, -10, -256)),
             Err(IntoColorError::IntConversion)
         );
     }
@@ -88,8 +85,8 @@ mod tests {
     #[test]
     fn test_tuple_sum() {
         assert_eq!(
-            Color::try_from(-1, 255, 255),
-            Err(IntoColorError::IntCoversion)
+            Color::try_from((-1, 255, 255)),
+            Err(IntoColorError::IntConversion)
         );
     }
 
@@ -117,7 +114,7 @@ mod tests {
     #[test]
     fn test_array_out_of_range_negative() {
         let c: Result<Color, _> = [-10, -256, -1].try_into();
-        assert_eq!(c, Err(IntocolorError::IntConversion));
+        assert_eq!(c, Err(IntoColorError::IntConversion));
     }
 
     #[test]
