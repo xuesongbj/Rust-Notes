@@ -28,7 +28,7 @@ fn main() {
 }
 ```
 
-```rust
+```x86asm
 ; let s = "Hello".to_string();
 (gdb) ptype s
 type = struct alloc::string::String {
