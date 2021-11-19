@@ -78,4 +78,79 @@ SIMD起源于美国超级计算机之一的ILLIAC IV大型机中，它拥有64�
 
 &nbsp;
 
-## Rust中使用SIMDe
+## Rust中使用SIMD
+
+Rust 从1.27版本开始支持SIMD，并且默认为x86和x86_64目标启用SSE和SSE2优化。Rust基本支持市面上 90%的SIMD指令集，从SSE到AVX256。不过，目前还不支持AVX-512。
+
+Rust通过标准库 `std::arch` 和第三方库`stdsimd`结合的方式来支持SIMD。Rust对SIMD的支持属于比较底层的，在标准库中支持多种CPU平台架构，比如x86、x86_64、ARM、AArch64等。平台模块中所有的函数都是`unsafe`的，因为调用不支持的平台指令可能会导致未定义的行为。
+
+&nbsp;
+
+### SIMD 实例
+
+```rust
+// stdsimd仅支持Nightly环境
+#![feature(stdsimd)]
+
+// std标准库使用stdsimd进行替换
+use ::std as real_std;
+use stdsimd as std;
+
+// 静态CPU平台检查
+#[cfg(target_arch = "x86")]
+use ::std::arch::x86::*;
+
+#[cfg(target_arch = "x86_64")]
+use ::std::arch::x86_64::*;
+
+fn main() {
+    // 判断当前代码执行的CPU平台是否支持SSE4.2
+    if is_x86_feature_detected!("sse4.2") {
+        #[target_feature(enable = "sse4.2")]
+
+        // 定义了unsafe函数worker, 该函数使用SIMD指令执行字符串搜索任务。
+        // 因为要用到SIMD命令，所以该函数被标记为unsafe
+        unsafe fn worker() {
+            let needle = b"\r\n\t ignore this ";
+            let haystack = b"Split a \r\n\t line ";
+
+            // 调用 _mm_loadu_si128函数，该函数接收一个__m128i类型的原生指针，
+            // 它会从内存中将长度为128位的整数数据加载到向量寄存器中。
+            // 它实际调用的是Intel的_mm_loadu_si128指令
+            // 将needle字符串加载到向量寄存器中.
+            let a = _mm_loadu_si128(needle.as_ptr() as *const _);
+
+            // 将haystack字符串加载到向量寄存器中，这个过程称为打包字符串
+            let b = _mm_loadu_si128(haystack.as_ptr() as *const _);
+
+            // 在haystack字符串中查找匹配needle前三位的索引位置
+            let idx = _mm_cmpestri(
+                // a: 打包好的needle字符串
+                // 3: 要检索的长度
+                // b: 打包好的haystack字符串
+                // 20: 长度
+                // _SIDD_CMP_EQUAL_ORDERED: 比较模式说明符，代表字符串相等检测模式
+                a, 3, b, 20, _SIDD_CMP_EQUAL_ORDERED
+                );
+                assert_eq!(idx, 8);
+        }
+        unsafe { worker(); }
+    }
+}
+```
+
+&nbsp;
+
+### faster
+
+Rust社区还有很多simd库，例如faster和simdeez。相比标准库simd做了更近一步的抽象，对开发者友好。
+
+```rust
+use faster::*;
+
+fn main() {
+    let two_hundred = (&[2.0f32; 100][..]).simd_iter().simd_reduce(f32s(0.0), f32s(0.0), |acc, v| acc + v)
+        .sum();
+    assert_eq!(two_hundred, 200.0f32);
+}
+```
