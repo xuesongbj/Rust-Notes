@@ -114,3 +114,57 @@ fn main() {
     assert_eq!(rx.recv().unwrap(), 2);
 }
 ```
+
+&nbsp;
+
+### Channel死锁
+
+#### 共享通道(MPSC)
+
+产生死锁的Channel案例，在 `main` 主线程输出 `0` 到 `4` 结果之后，还会一直阻塞 `main` 主线程而不退出。这是因为 `rx` 的 `iter` 方法会阻塞线程，只要 `tx` 还没有被析构，该迭代器就会一直等待新的消息，只要 `tx` 被析构之后，迭代器才能返回 `None`，从而结束迭代退出 `main` 主线程。然而，`tx` 并未被析构，所以迭代器依旧等待，`tx` 也没有发送新的消息，从而造成一种死锁状态。要解决此问题，只需要显式调用 `drop`方法，将 `tx` 析构就可以。
+
+```rust
+use std::thread;
+use std::sync::mpsc::channel;
+
+fn main() {
+    let (tx, rx) = channel();
+    for i in 0..5 {
+        let tx = tx.clone();
+        thread::spawn(move ||{
+            tx.send(i).unwrap();
+        });
+    }
+
+    // drop(tx);
+    for j in rx.iter() {
+        println!("{:?}", j);
+    }
+}
+```
+
+&nbsp;
+
+#### 流通道(SPSC)
+
+在流通道内(单个`sender`)，发送端 `tx` 在离开 `spawn` 作用域之后会调用析构函数 `drop`，在 `drop`中会调用 `tx`内部的`drop_channel` 方法来**断开(DISCONNECT)** channel。这样设计是因为流通道底层自动使用(SPSC)队列来优化性能，因为流通道只是用于两个线程之间的通信，而共享通道底层使用的还是MPSC队列，在析构行为上比流通道略为复杂。
+
+```rust
+use std::sync::mpsc::channel;
+use std::thread;
+
+fn main() {
+    let (tx, rx) = channel();
+    thread::spawn(move || {
+        tx.send(1u8).unwrap();
+        tx.send(2u8).unwrap();
+        tx.send(3u8).unwrap();
+    });
+
+    for x in rx.iter() {
+        println!("receive: {}", x);
+    }
+}
+```
+
+在底层不管是SPSC还是MPSC队列，甚至是同步Channel使用的内置独立的队列，都是基于链表实现的。
