@@ -1,5 +1,7 @@
 # Crossbeam
+### 使用缓冲行填充提升并发性能
 
+并发编程中，有一个**伪共享(False Sharing)** 概念。为了提升性能，现代CPU都有自己的多级缓存。而在缓存系统中，都是以缓存行(Cache Line)为基本单位进行存储的，长度为64字节(L1)。 当程序中的数据存储在彼此相邻的连续内存中时，可以被L1级缓存一次加载完成，享受缓存带来的性能极致。当数据结构中的数据存储在非连续内存中时，则会出现缓存未命中的情况。
 Crossbeam是第三方库，实际开发中通常用来代替标准库。它是对标准库的扩展和包装，一共包含4大模块:
 
 * **用于增强 `std::sync` 的原子类型**：类似C++ 11 风格的 Comsume内存顺序原子类型 `AtomicConsume` 和用于存储和检索 `Arc`的`ArcCell`。
@@ -132,4 +134,56 @@ fn main() {
 }
 ```
 
-闭包中的`scope`参数是一个内部使用的`Scope`结构体，该结构体会负责子线程的创建、`join`父线程和析构等工作，以确保引用的安全。
+闭包中的`scope`参数是一个内部使用的`Scope`结构体，该结构体会负责子线程的创建、`join` 父线程和析构等工作，以确保引用的安全。
+
+&nbsp;
+
+### 使用缓冲行填充提升并发性能
+
+为了提升性能，现代CPU都有自己的多级缓存。而在缓存系统中，都是以缓存行(Cache Line)为基本单位进行存储的，长度为64字节(L1)。 当程序中的数据存储在彼此相邻的连续内存中时，可以被L1级缓存一次加载完成，享受缓存带来的性能极致。当数据结构中的数据存储在非连续内存中时，则会出现缓存未命中的情况。
+
+&nbsp;
+
+#### 伪共享(False Sharing)
+
+并发编程中，有一个**伪共享(False Sharing)** 概念。将数据存储在连续紧凑的内存中虽然可以带来高性能，但是将置于多线程下就会发生问题。多线程操作同一个缓存行的不同字节，将会产生竞争，导致线程彼此牵连，互相影响，最终变成串行的程序，降低了并发性，这就是所谓的伪共享(False Sharing)。
+
+为了避免伪共享，就需要将多线程之间的数据进行隔离，使得它们不在同一行缓存行，从而提升多线程的并发性能。
+
+&nbsp;
+
+#### 伪共享解决方案
+
+避免伪共享的方案有很多，其中一种方案就是刻意增大元素间的间隔，使得不同线程的存取单位位于不同的缓存行。Crossbeam提供了`CachePadded<T>`类型，可以进行**缓存行填充(Padding)，**从而避免伪共享。
+
+在Crossbeam提供的并发数据结构中就用到了缓存行填充。比如并发的工作窃取双端队列(crossbeam-deque)，就用到了缓存行填充来避免伪共享，提升并发性能。
+
+&nbsp;
+
+### MPMC Channel
+
+Crossbeam提供了一个 `std::sync::mpsc` 的替代品 `MPMC Channel`，也就是多生产者多消费者通道。标准库 `mpsc` 中的 `Sender` 和 `Receiver` 都没有实现 `Sync`，但是 Crossbeam 提供的 `MPMC Channel` 的 `Sender` 和 `Receiver` 都实现了 `Sync`。
+
+Crossbeam提供的MPMC Channel和标准库的Channel类似，也提供了无界通道和有界通道两种类型。
+
+```rust
+use crossbeam::channel as channel;
+
+fn main() {
+    // 使用unbounded函数创建无界通道。
+    let (s, r) = channel::unbounded();
+    let _ = crossbeam::scope(|scope| {
+        scope.spawn(|_| {
+            let _ = s.send(1);
+            r.recv().unwrap();
+        });
+
+        scope.spawn(|_| {
+            let _ = s.send(2);
+            r.recv().unwrap();
+        });
+    });
+}
+```
+
+Crossbeam中还提供了 `select!` 宏，用于方便地处理一组通道中的消息。
