@@ -164,7 +164,7 @@ fn main() {
 
 Crossbeam提供了一个 `std::sync::mpsc` 的替代品 `MPMC Channel`，也就是多生产者多消费者通道。标准库 `mpsc` 中的 `Sender` 和 `Receiver` 都没有实现 `Sync`，但是 Crossbeam 提供的 `MPMC Channel` 的 `Sender` 和 `Receiver` 都实现了 `Sync`。
 
-Crossbeam提供的MPMC Channel和标准库的Channel类似，也提供了无界通道和有界通道两种类型。
+Crossbeam提供的`MPMC Channel`和标准库的Channel类似，也提供了**无界通道**和**有界通道**两种类型。
 
 ```rust
 use crossbeam::channel as channel;
@@ -187,3 +187,49 @@ fn main() {
 ```
 
 Crossbeam中还提供了 `select!` 宏，用于方便地处理一组通道中的消息。
+
+```rust
+use crossbeam_channel::select;
+use crossbeam_channel as channel;
+use std::thread;
+
+fn fibonacci(
+    fib: channel::Sender<u64>, quit: channel::Receiver<()>
+) {
+    let (mut x, mut y) = (0, 1);
+    loop {
+        // select! 宏每次只会执行一个操作
+        select! {
+            send(fib, x) -> _ => {
+                let tmp = x;
+                x = y;
+                y = tmp + y;
+            }
+
+            recv(quit) -> _ => {
+                println!("quit");
+                return;
+            }
+        }
+    }
+}
+
+fn main() {
+  // 如下两个有界通道是一种特殊的通道，在Crossbeam中叫做零容量通道.
+  // 这种通道会一直阻塞，除非接收端可以对其进行操作
+  let (fib_s, fib_r) = channel::bounded(0);
+  let (quit_s, quit_r) = channel::bounded(0);
+
+  // 生成一个子线程
+  thread::spawn(move || {
+      for _ in 0..10 {
+          // 接收fib_r通道数据
+          println!("{}", fib_r.recv().unwrap());
+      }
+
+      // 通过quit_s发送消息让fibonacci函数退出
+      let _ = quit_s.send(());
+  });
+  fibonacci(fib_s, quit_r);
+}
+```
