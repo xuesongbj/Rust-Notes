@@ -331,11 +331,11 @@ impl<'a, T: ?Sized> Pin<&'a mut T> {
 
 ###### Pin契约
 
-> 对于Pin<P<T>>,
+> 对于`Pin<P<T>>`,
 >
-> * 如果P<T>符合Unpin，那P<T>从被Pin包裹到被销毁，都要一直保证P<T>不被钉住
+> * 如果`P<T>`符合Unpin，那`P<T>`从被Pin包裹到被销毁，都要一直保证`P<T>`不被钉住
 > 
-> * 如果P<T>符合!Unpin，那P<T>从被Pin包裹到被销毁，都要一直保证P<T>被钉住
+> * 如果`P<T>`符合`!Unpin`，那`P<T>`从被`Pin`包裹到被销毁，都要一直保证`P<T>`被钉住
 
 如果实现了`Unpin`， `Pin`可以让你在Safe Rust下拿到 `&mut T`, 否则无法在Safe Rust钉住(也就是拿不到 `&mut T`)。
 
@@ -347,7 +347,7 @@ impl<'a, T: ?Sized> Pin<&'a mut T> {
 
 #### Pin::new()
 
-如果 `P` 指向的 `T` 是 `Unpin`的话，可以安全的调用 `Pin::new()`构造一个 `Pin`。`Pin::new()`的底层世纪上就是调用unsafe的`Pin::new_unchecked()`，之所以`Pin::new()` 是安全的，是因为 `Unpin`的情况下`Pin`的「钉住」效果不起作用，跟正常的指针一样的。
+如果 `P` 指向的 `T` 是 `Unpin`的话，可以安全的调用 `Pin::new()`构造一个 `Pin`。`Pin::new()`的底层实际上就是调用unsafe的`Pin::new_unchecked()`，之所以`Pin::new()` 是安全的，是因为 `Unpin`的情况下`Pin`的「钉住」效果不起作用，跟正常的指针一样的。
 
 ```rust
 impl<P: Deref<Target: Unpin>> Pin<P> {
