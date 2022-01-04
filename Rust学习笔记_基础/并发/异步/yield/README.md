@@ -31,22 +31,19 @@ use std::ops::Generator;
 use std::pin::Pin;
 
 fn main() {
-    // 创建生成器
-    // yield 专门为生成器引入的关键字
-    let mut gen = || {
-        yield 1;        // 生成器挂起，返回 1
-        yield 2;        // 生成器挂起，返回 2
-        yield 3;        // 生成器挂起，返回 3
-        return 4        // 退出
+    let ret = "foo";
+    let mut generator = move || {
+        // 创建生成器
+        // yield 专门为生成器引入的关键字
+        yield 1;                        // 生成器挂起，返回 1
+        return ret                      // 退出
     };
 
-    for _ in 0..4 {
-        // 此函数将恢复生成器的执行或开始执行(如果尚未执行)。 
-        // 此调用将返回到生成器的最后一个暂停点，从最新的 `yield` 恢复执行。 
-        // 生成器将继续执行，直到它产生或返回，此时此函数将返回。
-        let c = Pin::new(&mut gen).resume(());
-        println!("{:?}", c);
-    }
+    // 此函数将恢复生成器的执行或开始执行(如果尚未执行)。 
+    // 此调用将返回到生成器的最后一个暂停点，从最新的 `yield` 恢复执行。 
+    // 生成器将继续执行，直到它产生或返回，此时此函数将返回。
+    Pin::new(&mut generator).resume(());
+    Pin::new(&mut generator).resume(());
 }
 ```
 
@@ -79,6 +76,54 @@ pub trait Generator<R = ()> {
 
 &nbsp;
 
- #### 生成器脱糖
+#### 生成器脱糖
 
-如上实例代码是加了糖的，编译器经过编译后
+如上实例代码是加了糖的，编译器经过编译后会进行脱糖，脱糖后编译器自动生成一个匿名的枚举体，然后为该枚举体自动实现 `Generator`。
+
+```rust
+#![feature(arbitrary_self_types, generators, generator_trait)]
+
+use std::ops::{Generator, GeneratorState};
+use std::pin::Pin;
+
+fn main() {
+    let ret = "foo";
+    let mut generator = {
+        enum __Generator {
+            Start(&'static str),
+            Yield1(&'static str),
+            Done,
+        }
+
+        impl Generator for __Generator {
+            type Yield = i32;
+            type Return = &'static str;
+
+            fn resume(mut self: Pin<&mut Self>, resume: ()) -> GeneratorState<i32, &'static str> {
+                use std::mem;
+                match mem::replace(&mut *self, __Generator::Done) {
+                    __Generator::Start(s) => {
+                        *self = __Generator::Yield1(s);
+                        GeneratorState::Yielded(1)
+                    }
+
+                    __Generator::Yield1(s) => {
+                        *self = __Generator::Done;
+                        GeneratorState::Complete(s)
+                    }
+
+                    __Generator::Done => {
+                        panic!("generator resumed after completion")
+                    }
+                }
+            }
+        }
+
+        // Start作为初始状态
+        __Generator::Start(ret)
+    };
+
+    Pin::new(&mut generator).resume(());
+    Pin::new(&mut generator).resume(());
+}
+```
