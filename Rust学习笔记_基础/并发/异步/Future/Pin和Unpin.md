@@ -64,28 +64,30 @@ fn main() {
 `s1` 和 `s2` 两个变量在栈上分配内存，通过`ptr` 指针指向堆上数据空间。`move` 所有权转移时，会在栈上开辟一块内存`s2`，然后将`s1`栈上内容拷贝到`s2`，所以`s1`的内存失效。
 
 ```x86asm
-; stack
+; let s1 = String::from("Hello");
 (gdb) p/x $rsp+0x18
-$3 = 0x7fffffffe258
+$5 = 0x7fffffffe4b8
+
+(gdb) x/3xg 0x7fffffffe4b8
+0x7fffffffe4b8:	0x00005555555a49d0	0x0000000000000005
+0x7fffffffe4c8:	0x0000000000000005
+
+; let s2 = s1
+(gdb) p/x $rax
+$6 = 0x7fffffffe4d0
+
+(gdb) x/3xg 0x7fffffffe4d0
+0x7fffffffe4d0:	0x00005555555a49d0	0x0000000000000005
+0x7fffffffe4e0:	0x0000000000000005
 
 ; s1 => {ptr, len, cap}
-(gdb) x/3xg 0x7fffffffe258
-0x7fffffffe258:	0x000055555559c9d0	0x0000000000000005
-0x7fffffffe268:	0x0000000000000005
+(gdb) x/3xg 0x00005555555a49d0
+0x5555555a49d0:	0x0000006f6c6c6548	0x0000000000000000
+0x5555555a49e0:	0x0000000000000000
 
 ; heap => hello
-(gdb) x/5xb 0x000055555559c9d0
-0x55555559c9d0:	0x48	0x65	0x6c	0x6c	0x6f
-
-(gdb) ptype s1
-type = struct alloc::string::String {
-  vec: alloc::vec::Vec<u8, alloc::alloc::Global>,
-}
-
-(gdb) ptype s2
-type = struct alloc::string::String {
-  vec: alloc::vec::Vec<u8, alloc::alloc::Global>,
-}
+(gdb) x/5xb 0x00005555555a49d0
+0x5555555a49d0:	0x48	0x65	0x6c	0x6c	0x6f
 ```
 
 &nbsp;
@@ -176,18 +178,15 @@ a: test1, b: test1
 a: test1, b: I've totally changed now!
 ```
 
-以上实例出现了问题！! 原因是Test结构体中的字段b是一个指向字段a的指针，它在栈上存的是字段a的地址。通过swap()函数交换两个Test结构体之后，字段a,b分别移动到对方的内存区域上，但是a和b本身的内容没有变。也就是指针b依然指向的是原来的地址，但是这个地址现在已经属于另外一个结构体了！这不仅不是自引用结构体了，更可怕的是这个指针可能导致更危险的问题，这是Rust决不允许出现的！
+以上实例出现了问题！! 原因是`Test`结构体中的字段b是一个指向字段a的指针，它在栈上存的是字段a的地址。通过`swap()`函数交换两个`Test`结构体之后，字段a,b分别移动到对方的内存区域上，但是a和b本身的内容没有变。也就是指针b依然指向的是原来的地址，但是这个地址现在已经属于另外一个结构体了！这不仅不是自引用结构体了，更可怕的是这个指针可能导致更危险的问题，这是Rust决不允许出现的！
 
 ![move_swap](move_swap.jpg)
 
-
-更为关键的是 Rust的`Generator`和`async/await` 异步是基于自引用结构体实现的。如果不能从根本上解决这个问题，Rust号称Memory Safe的根基就完全动摇了。
+**更为关键的是 Rust的`Generator`和`async/await` 异步是基于自引用结构体实现的。如果不能从根本上解决这个问题，Rust号称Memory Safe的根基就完全动摇了。**
 
 > 推荐:
-> 
-> [https://rust-lang.github.io/async-book/](https://rust-lang.github.io/async-book/)
-> 
-> [https://cfsamson.github.io/books-futures-explained](https://cfsamson.github.io/books-futures-explained)
+> * [https://rust-lang.github.io/async-book/](https://rust-lang.github.io/async-book/)
+> * [https://cfsamson.github.io/books-futures-explained](https://cfsamson.github.io/books-futures-explained)
 
 &nbsp;
 
@@ -207,7 +206,7 @@ pub fn swap<T>(x: &mut T, y: &mut T) {
 }
 ```
 
-`swap()` 函数的参数要求是可变借用 `&mut`，所以只要我们想办法让 `Safe Rust` 下不暴露可变即借用即可。
+`swap()` 函数的参数要求是可变借用 `&mut`，所以只要我们想办法让 `Safe Rust` 下不暴露可变借用即可。
 
 &nbsp;
 
@@ -215,7 +214,7 @@ pub fn swap<T>(x: &mut T, y: &mut T) {
 
 `Pin`之前的标准库中没有这样的API能够防止在 `Safe Rust`下不暴露 `&mut T`。`Pin`可以从根源上解决这个问题(可以保证被包裹的指针`P<T>`永远钉住不让`move`)，但有一个`Unpin`先决条件，如果 `impl Unpin`，则无法实现其 `Safe Rust`。
 
-举例子， 如果我是`Pin`，你是 `P<T>`，如果你`impl`了`Unpin`,我会提供两种方法让你在Safe Rust下拿到 `&mut T`：
+举例子， 如果我是`Pin`，你是 `P<T>`，如果你`impl`了`Unpin`,我会提供两种方法让你在`Safe Rust`下拿到 `&mut T`：
 
 * 使用 `Pin::get_mut()`
 
@@ -223,18 +222,17 @@ pub fn swap<T>(x: &mut T, y: &mut T) {
 impl<'a, T: ?Sized> Pin<&'a mut T> {
     #[stable(feature = "pin", since = "1.33.0")]
     #[inline(always)]
-    pub fn get_mut(self) -> &'a mut T where T: Unpin {
+    pub fn get_mut(self) -> &'a mut T
+    where T: Unpin {
         self.pointer
     }
 }
 ```
 
-&nbsp;
-
 * `impl DerefMut`就可以解引用拿到 `&mut T`
 
 ```rust
-#[stable(feature = "ping", since = "1.33.0")]
+#[stable(feature = "pin", since = "1.33.0")]
 impl<P: DerefMut<Target: Unpin>> DerefMut for Pin<P> {
     fn deref_mut(&mut self) -> &mut P::Target {
         Pin::get_mut(Pin::as_mut(self))
@@ -309,7 +307,7 @@ struct Test() {
 impl !Unpin for Test{}
 ```
 
-使用以上两种方法任一个，就可以实现在 Safe Rust下无法拿到可变借用 `&mut T`，拿不到 `&mut T` 就无法作用到 `std::mem::swap()` 上，此时该自引用结构体被钉住了。
+使用以上两种方法任一个，就可以实现在`Safe Rust`下无法拿到可变借用 `&mut T`，拿不到 `&mut T` 就无法作用到 `std::mem::swap()` 上，此时该自引用结构体被钉住了。
 
 &nbsp;
 
@@ -337,7 +335,7 @@ impl<'a, T: ?Sized> Pin<&'a mut T> {
 > 
 > * 如果`P<T>`符合`!Unpin`，那`P<T>`从被`Pin`包裹到被销毁，都要一直保证`P<T>`被钉住
 
-如果实现了`Unpin`， `Pin`可以让你在Safe Rust下拿到 `&mut T`, 否则无法在Safe Rust钉住(也就是拿不到 `&mut T`)。
+如果实现了`Unpin`， `Pin`可以让你在`Safe Rust`下拿到 `&mut T`, 否则无法在`Safe Rust`钉住(也就是拿不到 `&mut T`)。
 
 &nbsp;
 
@@ -347,7 +345,7 @@ impl<'a, T: ?Sized> Pin<&'a mut T> {
 
 #### Pin::new()
 
-如果 `P` 指向的 `T` 是 `Unpin`的话，可以安全的调用 `Pin::new()`构造一个 `Pin`。`Pin::new()`的底层实际上就是调用unsafe的`Pin::new_unchecked()`，之所以`Pin::new()` 是安全的，是因为 `Unpin`的情况下`Pin`的「钉住」效果不起作用，跟正常的指针一样的。
+如果 `P` 指向的 `T` 是 `Unpin`的话，可以安全的调用 `Pin::new()`构造一个 `Pin`。`Pin::new()`的底层实际上就是调用`unsafe`的`Pin::new_unchecked()`，之所以`Pin::new()` 是安全的，是因为 `Unpin`的情况下`Pin`的「钉住」效果不起作用，跟正常的指针一样的。
 
 ```rust
 impl<P: Deref<Target: Unpin>> Pin<P> {
@@ -365,7 +363,7 @@ impl<P: Deref<Target: Unpin>> Pin<P> {
 
 #### pin::new_unchecked()
 
-它是unsafe的，标为unsafe的原因是编译器没办法保证使用者后续操作一定遵守Pin的契约。只要有存在违反契约的可能性，就必须用unsafe标记，因为这是使用者的问题，编译器没办法保证。
+它是unsafe的，标为 `unsafe` 的原因是编译器没办法保证使用者后续操作一定遵守`Pin`的契约。只要有存在违反契约的可能性，就必须用`unsafe` 标记，因为这是使用者的问题，编译器没办法保证。
 
 ```rust
 impl<P: Deref> Pin<P> {
@@ -584,21 +582,14 @@ where
 &nbsp; 
 #### `Pin` 的黄金8条
 
-* If T: Unpin (which is the default), then Pin<'a, T> is entirely equivalent to &'a mut T. in other words: Unpin means it's OK for this type to be moved even when pinned, so Pin will have no effect on such a type.
-
-* Getting a &mut T to a pinned T requires unsafe if T: !Unpin.
-
-* Most standard library types implement Unpin. The same goes for most "normal" types you encounter in Rust. A Future generated by async/await is an exception to this rule.
-
-* You can add a !Unpin bound on a type on nightly with a feature flag, or by adding std::marker::PhantomPinned to your type on stable.
-
-* You can either pin data to the stack or to the heap.
-
-* Pinning a !Unpin object to the stack requires unsafe
-
-* Pinning a !Unpin object to the heap does not require unsafe. There is a shortcut for doing this using Box::pin.
-
-* For pinned data where T: !Unpin you have to maintain the invariant that its memory will not get invalidated or repurposed from the moment it gets pinned until when drop is called. This is an important part of the pin contract.
+* `T: Unpin` 类型数据无法钉住(`pin`)
+* 钉住(`pin`)`&mut T`类型数据需要使用`unsafe`
+* 标准库的大部分类型都实现了`Unpin`，`async/await` 生成的 `Future` 除外
+* 可以在`nightly`版本添加`!Unpin`实现钉住(`pin`)或者在`stable`版本将`std::marker::PhantomPinned`添加至目标类型
+* `pin`可以分配在`stack`或者`heap`
+* `!Unpin`类型对象`pin`到`stack`上需要使用`unsafe`
+* `!Unpin`类型对象`pin`到`heap`上不需要使用`unsafe`
+* 已经钉住(`pin`)的`T:!Unpin`数据不可变，直到内存被销毁(`drop`函数被调用之前)
 
 #### async/await 里程碑
 
