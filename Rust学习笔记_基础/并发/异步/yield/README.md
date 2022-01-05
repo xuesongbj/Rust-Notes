@@ -127,3 +127,33 @@ fn main() {
     Pin::new(&mut generator).resume(());
 }
 ```
+
+&nbsp;
+
+### 生成器与迭代器
+
+生成器是一个非常有用的功能，如果只关注计算的过程，而不关心计算的结果，则可以将 `Return` 设置为单元类型，只保留 `Yield` 的类型，那么生成器就可以化身为迭代器。
+
+```rust
+#![feature(generators, generator_trait)]
+use std::ops::{Generator, GeneratorState};
+use std::pin::Pin;
+
+fn main() {
+    let mut gen = || {
+        let mut x = 0;
+        loop {
+            x += 1;
+            yield x;
+        }
+    };
+    for _ in 0..10 {
+        match Pin::new(&mut gen).resume(()) {
+            GeneratorState::Yielded(i) => println!("{:?}", i),
+            _ => println!("Completed"),
+        }
+    }
+}
+```
+
+生成器的性能比迭代器更高，因为生成器是一种延迟计算或惰性计算，它避免了比必要的计算，只有在每次需要时才通过 `yield` 产生相关的值。
