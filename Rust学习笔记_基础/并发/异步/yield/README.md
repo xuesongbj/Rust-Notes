@@ -157,3 +157,36 @@ fn main() {
 ```
 
 生成器的性能比迭代器更高，因为生成器是一种延迟计算或惰性计算，它避免了比必要的计算，只有在每次需要时才通过 `yield` 产生相关的值。
+
+&nbsp;
+
+### 用生成器模拟Future
+
+`Future`是一种异步并发模型，它实际上是代理模式和异步开发的混合产物。`Future` 是对「未来」的一种代理凭证，凭借这个凭证可以异步地在未来某个时候得到确定的结果。而不需要同步等待。
+
+如果只关注生成器结果，则可以将`Yield` 设置为单元类型，只保留 `Return`的类型，生成器就可以化身为`Future`。
+
+```rust
+#![feature(generators, generator_trait)]
+use std::pin::Pin;
+use std::ops::{Generator, GeneratorState};
+
+
+fn main() {
+    let limit = 2;
+    let mut gen = move || {
+        for _x in 0..limit {
+            yield ();
+        }
+    };
+
+    for i in 0..=limit {
+        match Pin::new(&mut gen).resume(()) {
+            GeneratorState::Yielded(_v) => println!("resume {:?} : Pending", i),
+            GeneratorState::Complete(_v) => println!("resume {:?} : Ready", i),
+        }
+    }
+}
+```
+
+生成器属于一种半协程(`Semi-Coroutine`)。半协程是一种特殊的且能力较弱的协程，它只能在生成器和调用者之间进行跳转，而不能在生成器之间进行跳转。
