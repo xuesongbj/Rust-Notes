@@ -1,17 +1,40 @@
-# Future运行原理
+# Future并发模式
 
-* Future 具体特征:
+Rust对`Future`异步并发模式做了一个完整的抽象，包含在第三方库[futures-rs](https://github.com/rust-lang/futures-rs)中。该抽象主要包含三个组件:
+
+* **Future**：基本的异步计算抽象单元。
+* **Executor**：异步计算调度层。
+* **Task**：异步计算执行层。
+
+&nbsp;
+
+## Future
+
+在Rust中，Future是一个`trait`，源码如下：
 
 ```rust
 pub trait Future {
+    // Output一个占位类型，在实现该特征时，该类型可以被替换成其他类型
     type Output;
+
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
+}
+```
+
+`poll`方法是`Future`的核心，它是对`轮询`行为的一种抽象。在Rust中，每个`Future`都需要使用`poll`方法来轮询所要计算值的状态。该方法返回的`poll`是一个枚举类型，该类型包含两个枚举值，即 `Ready(T)` 和 `Pending`。 该类型和 `Option<T>`、`Result<T, E>`相似，都属于和类型。他是对**准备好**和**未完成**两种状态的统一抽象，以此来表达`Future`的结果。
+
+```rust
+pub enum Poll<T> {
+    Ready(#[stable(feature = "futures_api", since = "1.36.0")] T),
+    Pending,
 }
 ```
 
 &nbsp;
 
-## Future 执行流程
+### Future 执行流程
+
+![Future调度流程图](./imgs/Future调度流程图.png)
 
 Rust中一个`Future`被执行常见的流程:
 
@@ -27,7 +50,7 @@ Rust中一个`Future`被执行常见的流程:
 
 &nbsp;
 
-### Future实例 
+### Future实例
 
 ```rust
 use futures::channel::mpsc;
@@ -90,6 +113,7 @@ pub struct Context<'a> {
     _marker: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 ```
+
 &nbsp;
 
 > break changes:
