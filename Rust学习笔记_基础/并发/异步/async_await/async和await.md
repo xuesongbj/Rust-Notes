@@ -1,7 +1,6 @@
-# async和await!
+# `async`和`await!`
 
 `async/await!` 是Rust语法的特殊部分，可以实现多执行任务的异步执行。
-
 
 ## async使用方法
 
