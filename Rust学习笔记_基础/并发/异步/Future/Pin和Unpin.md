@@ -2,32 +2,21 @@
 
 ## Pin
 
-`Pin` 是一个智能指针，它内部包含了另一个指针 `P`，只要`P`指针指向的内容(`T`)没有实现 `Unpin`，则可以保证 `T` 永远不会被移动(`move`)。`Pin` 单词很形象的表示 `Pin` 就像钉子一样可以把 `T` 钉住。所以 `Pin`一般来说用 `Pin<P<T>>` 这种方式表示(`P` 是Pointer 的缩写， `T` 是 Type的缩写)。
+`Pin` 是一个被定义在`std::pin`模块中的智能指针，它内部包含了另一个指针 `P`，只要`P`指针指向的内容(`T`)没有实现 `Unpin`，则可以保证 `T` 永远不会被移动(`move`)。`Pin` 单词很形象的表示 `Pin` 就像钉子一样可以把 `T` 钉住。所以 `Pin`一般用 `Pin<P<T>>` 这种方式表示(`P` 是Pointer 的缩写， `T` 是 Type的缩写)。
 
 ```rust
-/// A pinned pointer.
-///
-/// This is a wrapper around a kind of pointer which makes that pointer "pin" its
-/// value in place, preventing the value referenced by that pointer from being moved
-/// unless it implements [`Unpin`].
-#[stable(feature = "pin", since = "1.33.0")]
-#[lang = "pin"]
-#[fundamental]
-#[repr(transparent)]
-#[derive(Copy, Clone)]
 pub struct Pin<P> {
     pointer: P,
 }
 
-#[stable(feature = "pin", since = "1.33.0")]
 impl<P: Deref> Deref for Pin<P> {
     type Target = P::Target;
+
     fn deref(&self) -> &P::Target {
         Pin::get_ref(Pin::as_ref(self))
     }
 }
 
-#[stable(feature = "pin", since = "1.33.0")]
 impl<P: DerefMut<Target: Unpin>> DerefMut for Pin<P> {
     fn deref_mut(&mut self) -> &mut P::Target {
         Pin::get_mut(Pin::as_mut(self))
@@ -35,13 +24,13 @@ impl<P: DerefMut<Target: Unpin>> DerefMut for Pin<P> {
 }
 ```
 
-* `Pin`是一个智能指针(实现了`Deref`和`DerefMut`)。
-* `Pin`包裹的内容只能是指针，不能是其它类型。比如`Pin<u32>` 没有意义。
-* `Pin`具有"钉住"`T`不能移动的功能，这个功能是否有效取决于 `T` 是否 `impl Unpin`。如果 `T` 实现了 `Unpin`，`Pin` 的“钉住”功能完全失效了，此时 `Pin<P<T>>` 等价于 `P<T>`。
-* `Unpin` 是一个 `auto trait`，编译器默认会给所有类型实现 `Unpin`。但`PhantomPinned`和编译为`async/await` desugar(脱糖)之后生成的 `impl Future`的结构体除外，它们实现的是`!Unpin`。
-* 所以 `Pin<P<T>>`默认情况下的 "钉住"功能是不生效的，只针对上面说的这几个 `impl !Unpin`情况有效。
+* `Pin`是一个智能指针(实现了`Deref`和`DerefMut`)
+* `Pin`包裹的内容只能是指针，不能是其它类型。比如`Pin<u32>` 没有意义
+* `Pin`具有「钉住」`T`不能移动的功能，这个功能是否有效取决于 `T` 是否 `impl Unpin`。如果 `T` 实现了 `Unpin`，`Pin` 的「钉住」功能完全失效了，此时 `Pin<P<T>>` 等价于 `P<T>`
+* `Unpin` 是一个 `auto trait`，编译器默认会给所有类型实现 `Unpin`。但`PhantomPinned`和编译为`async/await` desugar(脱糖)之后生成的 `impl Future`的结构体除外，它们实现的是`!Unpin`
+* 所以 `Pin<P<T>>` 默认情况下的 「钉住」功能是不生效的，只针对上面说的这几个 `impl !Unpin`情况有效
 
-> Pin主要是为了解决 `async/await` 自动生成 Future的问题。问题就是自引用，移动自引用结构体会造成指针失效。
+> Pin主要是为了解决 `async/await` 自动生成 `Future` 的问题。问题就是自引用，移动自引用结构体会造成指针失效。
 
 &nbsp;
 
@@ -126,8 +115,6 @@ fn main() {
 
 由于生命周期的问题，目前Rust中只能通过指针实现自引用结构体。
 
-&nbsp;
-
 ```rust
 #[derive(Debug)]
 struct Test {
@@ -195,11 +182,7 @@ a: test1, b: I've totally changed now!
 导致以上实例问题在于 `std::mem::swap(&mut test1, &mut test2)` 这行代码，它导致了自引用结构体失效引发了内存安全问题。解决好 `swap()` 函数安全问题，就可以避免以上实例的问题。
 
 ```rust
-#[inline]
-#[stable(feature = "rust1", since = "1.0.0")]
 pub fn swap<T>(x: &mut T, y: &mut T) {
-    // SAFETY: the raw pointers have been created from safe mutable references satisfying all the
-    // constraints on `ptr::swap_nonoverlapping_one`
     unsafe {
         ptr::swap_nonoverlapping_one(x, y);
     }
@@ -220,8 +203,6 @@ pub fn swap<T>(x: &mut T, y: &mut T) {
 
 ```rust
 impl<'a, T: ?Sized> Pin<&'a mut T> {
-    #[stable(feature = "pin", since = "1.33.0")]
-    #[inline(always)]
     pub fn get_mut(self) -> &'a mut T
     where T: Unpin {
         self.pointer
@@ -232,7 +213,6 @@ impl<'a, T: ?Sized> Pin<&'a mut T> {
 * `impl DerefMut`就可以解引用拿到 `&mut T`
 
 ```rust
-#[stable(feature = "pin", since = "1.33.0")]
 impl<P: DerefMut<Target: Unpin>> DerefMut for Pin<P> {
     fn deref_mut(&mut self) -> &mut P::Target {
         Pin::get_mut(Pin::as_mut(self))
@@ -266,11 +246,8 @@ impl<T: ?Sized> Unpin for *mut T {}
 有一个例外 `PhantomPinned`， 它实现了 `!Unpin`。
 
 ```rust
-#[stable(feature = "pin", since = "1.33.0")]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PhantomPinned;
 
-#[stable(feature = "pin", since = "1.33.0")]
 impl !Unpin for PhantomPinned {}
 ```
 
@@ -317,8 +294,6 @@ impl !Unpin for Test{}
 
 ```rust
 impl<'a, T: ?Sized> Pin<&'a mut T> {
-    #[stable(feature = "pin", since = "1.33.0")]
-    #[inline(always)]
     pub unsafe fn get_unchecked_mut(self) -> &'a mut T {
         self.pointer
     }
@@ -349,11 +324,7 @@ impl<'a, T: ?Sized> Pin<&'a mut T> {
 
 ```rust
 impl<P: Deref<Target: Unpin>> Pin<P> {
-    #[stable(feature = "pin", since = "1.33.0")]
-    #[inline(always)]
     pub fn new(pointer: P) -> Pin<P> {
-        // Safety: the value pointed to is `Unpin`, and so has no requirements
-        // around pinning.
         unsafe { Pin::new_unchecked(pointer) }
     }
 }
@@ -545,33 +516,25 @@ pub const fn from_generator<T>(gen: T) -> impl Future<Output = T::Return>
 where
     T: Generator<ResumeTy, Yield = ()>,
 {
-    #[rustc_diagnostic_item = "gen_future"]
     struct GenFuture<T: Generator<ResumeTy, Yield = ()>>(T);
 
-    // We rely on the fact that async/await futures are immovable in order to create
-    // self-referential borrows in the underlying generator.
+    // 实现了 `!Unpin`
     impl<T: Generator<ResumeTy, Yield = ()>> !Unpin for GenFuture<T> {}
 
     impl<T: Generator<ResumeTy, Yield = ()>> Future for GenFuture<T> {
         type Output = T::Return;
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            // SAFETY: Safe because we're !Unpin + !Drop, and this is just a field projection.
             let gen = unsafe { Pin::map_unchecked_mut(self, |s| &mut s.0) };
 
-            // Resume the generator, turning the `&mut Context` into a `NonNull` raw pointer. The
-            // `.await` lowering will safely cast that back to a `&mut Context`.
             match gen.resume(ResumeTy(NonNull::from(cx).cast::<Context<'static>>())) {
                 GeneratorState::Yielded(()) => Poll::Pending,
                 GeneratorState::Complete(x) => Poll::Ready(x),
             }
         }
     }
-
     GenFuture(gen)
 }
 ```
-
-`impl<T: Generator<ResumeTy, Yield = ()>> !Unpin for GenFuture<T> {}` 此行代码实现了 `!Unpin`。
 
 &nbsp;
 
@@ -579,7 +542,8 @@ where
 
 `Pin` 除了以上内容外，还有其它几个概念。`Pin projection`, `Structural pin` 和 `Non-structural pin`。
 
-&nbsp; 
+&nbsp;
+
 #### `Pin` 的黄金8条
 
 * `T: Unpin` 类型数据无法钉住(`pin`)
