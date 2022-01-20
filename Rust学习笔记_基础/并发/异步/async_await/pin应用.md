@@ -60,3 +60,47 @@ impl<'a> Generator for __Gen<'a> {
 如上实例，`std::mem::replace(self, __Gen::Done)` 会发生移动指针内存位置，将 `State1`替换为`State2`。意味着 `State1`的所有权已经发生了转移。`State1` 内存位置的改变会影响到字段`x`的位置，而此时其内部的字段`ref_x`还在引用字段`x`的值，这就造成了**悬垂指针**。
 
 针对以上问题，可以使用 `Pin`方案进行解决。
+
+```rust
+use std::pin::Pin;
+use std::marker::{PhantomPinned, Unpin};
+use std::ptr::NonNull;
+
+struct Unmovable {
+    data: String,
+ 
+    slice: NonNull<String>,
+    
+    // 自定义结构体有了PhantomPinned属性，则该结构体即可实现 !Unpin
+    _pin: PhantomPinned,
+}
+
+impl Unpin for Unmovable {}
+
+impl Unmovable {
+    fn new(data: String) -> Pin<Box<Self>> {
+        let res = Unmovable {
+            data,
+            slice: NonNull::dangling(),
+            _pin: PhantomPinned,
+        };
+
+        let mut boxed = Box::pin(res);
+        let slice = NonNull::from(&boxed.data);
+        unsafe {
+            let mut_ref: Pin<&mut Self> = Pin::as_mut(&mut boxed);
+            Pin::get_unchecked_mut(mut_ref).slice = slice;
+        }
+        boxed
+    }
+}
+
+fn main() {
+    let unmoved = Unmovable::new("hello".to_string());
+    let mut still_unmoved = unmoved;
+    assert_eq!(still_unmoved.slice,
+                NonNull::from(&still_unmoved.data));
+    let mut new_unmoved = Unmovable::new("world".to_string());
+    std::mem::swap(&mut *still_unmoved, &mut *new_unmoved);
+}
+```
