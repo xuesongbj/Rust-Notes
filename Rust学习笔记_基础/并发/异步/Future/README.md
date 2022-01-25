@@ -269,7 +269,7 @@ where
 {
     type Output = ();
 
-    fn poll(&mut slef, wake: fn()) -> Poll<Self::Output> {
+    fn poll(&mut self, wake: fn()) -> Poll<Self::Output> {
         // 尝试完成 future `a`.
         if let Some(a) = &mut self.a {
             if let Poll::Read(()) = a.poll(wake) {
