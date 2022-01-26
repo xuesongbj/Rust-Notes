@@ -143,12 +143,19 @@ pub fn almost_ready(value: i32) -> AlmostReady {
     AlmostReady{ ready: false, value }
 }
 
+// 为AlmostReady结构体实现Future
 impl Future for AlmostReady {
     type Output = i32;
+
+    // poll方法的参数需要是 pin<&mut Self> 类型，以及一个可以唤醒任务的句柄ctx
+    // 如果任务已经准备好轮询，则由它通知Executor进行调度。
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
+        // 判断当前任务是否已经处理完成，如果为true，则返回结果，异步计算结束
         if self.ready {
             Poll::Ready(self.value + 1)
         } else {
+            // 如果为false，则继续进行计算，直到将ready字段设置为true，代表此时计算已完成。
+            // 同时，通过ctx句柄调用wake方法，将任务再次唤醒，等待下一次轮询(将异步任务重新加入任务队列中)
             unsafe { Pin::get_unchecked_mut(self).ready = true; }
             let waker = ctx.waker().clone();
             waker.wake();
@@ -159,11 +166,18 @@ impl Future for AlmostReady {
 
 fn main() {
     let pool = ThreadPool::new().unwrap();
+
+    // 通过async块创建Future实例future，在async块中将almost_ready函数返回的初始AlmostReady实例置于await中，等待异步任务执行的结果
     let future = async {
         println!("howdy!");
         let x = almost_ready(5).await;
         println!("done: {:?}", x);
     };
+
+    // 在spawn_ok方法中，会将传入的future打包成一个FutureObj对象，并将其通过内置的spawn_obj方法发送到Channel队列中，
+    // 等待work方法执行该任务
     pool.spawn_ok(future);
 }
 ```
+
+`Task`就像是在线程基础上又抽象出来的一层“轻量级线程”。比如在 `future-rs`库中内置了`spawn_obj`和`spawn`等函数来方便开发者将Future放入其中，生成异步任务。因此 `Future` 异步开发体系被称为**用户级线程**。
