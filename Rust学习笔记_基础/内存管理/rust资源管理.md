@@ -155,3 +155,150 @@ fn main() {
 `Drop`被执行很重要，他可以帮助智能指针在被丢弃时，自动执行一些重要的清理工作，比如**释放堆内存**。除了可以释放内存，`Drop`还可以做很多其他的工作，比如释放文件和网络连接。
 
 `Drop`的功能有点儿类似GC，但它比GC的应用更加广泛，GC只能回收内存，而`Drop`可以回收内存及内存之外的一切资源。
+
+&nbsp;
+
+#### 确定性析构
+
+以上的资源管理方式叫RAII(Resource Acquisition Is Initialization)，资源获取即初始化。RAII和智能指针均起源于C++，智能指针就是基于RAII机制来实现的。
+
+在C++中，RAII的机制是使用构造函数来初始化资源，使用析构函数来回收资源。看上去RAII所要做的事情确实跟GC差不多，但RAII和GC最大的不同在于，RAII将资源托管给创建堆内存的指针对象本身进行管理，并保证资源在生命周期内始终有效，一旦生命周期终止，资源马上会被回收。而GC是由第三方针对内存来统一回收垃圾的，这样很被动。正是因为RAII的这些优势，Rust才将其纳入自己的体系中。
+
+**Rust并没有像C++一样所拥有的那种构造函数(constructor)，而是直接对每个成员的初始化来完成构造，也可以直接通过封装一个静态函数来构造「构造函数」。** Rust中的`Drop`就是析构函数。
+
+```rust
+// Drop已经被标记为语言项，表明该trait为语言本身所用，
+// 比如智能指针被丢弃后自动触发析构函数，编译器知道该去
+// 哪里找Drop
+#[lang = "drop"]
+pub trait Drop {
+    fn drop(&mut self);
+}
+```
+
+#### Drop实例
+
+```rust
+use std::ops::Drop;
+
+#[derive(Debug)]
+struct S(i32);
+
+impl Drop for S {
+    fn drop(&mut self) {
+        println!("drop {}", self.0);
+    }
+}
+
+fn main() {
+    // 变量x的作用域范围是整个main函数
+    let x = S(1);
+    println!("crate x: {:?}", x);
+
+    {
+        // 变量y的作用域是当前代码块
+        let y = S(2);
+        println!("crate y: {:?}", y);
+        println!("exit inner scope");
+    }
+
+    println!("exit main");
+}
+```
+
+以下是执行结果，变量`x`和`y`分别离开作用域时，都执行了`drop`方法。所以RAII有一个别名,叫**作用域界定的资源管理(Scope-Bound Resource Management, SBRM)**。
+
+```bash
+root@8d75790f92f5:~/rs/eee/src# cargo r
+   Compiling eee v0.1.0 (/root/rs/eee)
+    Finished dev [unoptimized + debuginfo] target(s) in 4.12s
+     Running `/root/rs/eee/target/debug/eee`
+
+crate x: S(1)
+crate y: S(2)
+exit inner scope
+drop 2
+exit main
+drop 1
+```
+
+正是有了`Drop`的特性，它允许在对象即将消亡之时，自行调用指定代码(`drop`方法)。
+
+&nbsp;
+
+## 复合类型的内存分配和布局
+
+Rust中基本原生数据类型默认被分配到栈上。结构体(Struct)、枚举体(Enum)和联合体(Union)本身被分配在栈上，其内部元素根据特征分配在stack或heap上。
+
+```rust
+struct A {
+    a: u32,
+    b: Box<u64>,
+}
+
+struct B(i32, f64, char);
+
+struct N;
+
+enum E {
+    H(u32),
+    M(Box<u32>)
+}
+
+union U {
+    u: u32,
+    v: u64
+}
+
+fn main() {
+    println!("Box<64>: {:?}", std::mem::size_of::<Box<u64>>());
+    println!("A: {:?}", std::mem::size_of::<A>());
+    println!("B: {:?}", std::mem::size_of::<B>());
+    println!("N: {:?}", std::mem::size_of::<N>());
+    println!("E: {:?}", std::mem::size_of::<E>());
+    println!("U: {:?}", std::mem::size_of::<U>());
+}
+```
+
+### Struct A 内存布局
+
+```rust
+struct A {
+    a: u32,
+    b: Box<u64>,
+}
+```
+
+`struct A` 的成员 `a` 为数字类型，`b` 为 `Box<T>` 类型。根据内存对齐规则，结构体A的大小为16字节，其内存对齐示意如图:
+
+![结构体A](./imgs/结构体A.png)
+
+`struct A` 在函数中有实例被初始化时，该结构体会被放到栈中，首地址为第一个成员变量`a`的地址，长度为16字节；成员`b`是`Box<u32>`类型，会在堆上开辟空间存放数据，但是指针会返回给成员b，并存放在栈上，一共占8字节。
+
+&nbsp;
+
+### Struct B
+
+`struct B` 为元组结构体，对齐规则和普通结构图一样，占用16字节。
+
+&nbsp;
+
+### Struct N
+
+`struct N` 为单元结构体，占用0个字节。
+
+&nbsp;
+
+### enum E
+
+`enum E` 实际上是一种标签联合体(Tagged Union)，跟普通联合体(Union)的共同点在于，成员变量公用一块内存，所以联合体也被称为共用体。
+
+不同点在于，标签联合体中每个成员都有一个标签(tag)，用于显式地表明同一时刻哪一个成员在使用内存，而且标签也需要占用内存。
+
+操作枚举体的时候，需要匹配处理其所有成员。
+
+![enumE](./imgs/enum_e.png)
+
+`enum E`的成员`H(u32)`和`M(Box<u32>)`中，`H`和`M`就是标签，占1字节。但是`H`和`M`都带自定义数据，`u32`和`Box<u32>`，其中`Box<u32>`最长，按联合体的内存对齐规则，此处按8字节对齐。所以，标签需要补齐到8个字节，自定义数据取最长字节，即8个字节，整个枚举体的长度为标签和自定义数据之和，为16字节。`union U` 没有标签，按内存对齐规则，占8个字节。
+
+当枚举体和联合体在函数中有实例被初始化时，与结构体一样，也会被分配到栈中，占相应字节长度。如果成员的值存放于堆上，那么栈中就存放其指针。
