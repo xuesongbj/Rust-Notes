@@ -4,8 +4,6 @@
 
 Rust是一门系统级编程语言，和C、C++、Go等语言的设计思想有较大差异。学习Rust并不仅仅学习一门语言，更重要是学习它的设计思想。
 
-![rust programming language](./rust_language.jpeg)
-
 &nbsp;
 
 ## 为什么使用Rust？
@@ -276,3 +274,7 @@ Rust董事会成员共有12人，创始成员承诺：在2年内，将提供**�
 │       └── 元编程
 └──
 ```
+
+### 交流与沟通
+
+<img width="150" height="150" src="./wechat.jpeg">
